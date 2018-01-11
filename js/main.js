@@ -5,7 +5,7 @@ const appId = 'calibre-web-186715';
 
 var pickerApiLoaded = false;
 var oauthToken;
-var DB, currentView;
+var DB;
 
 // Use the Google API Loader script to load the google.picker script.
 function loadPicker() {
@@ -59,11 +59,8 @@ function pickerCallback(data) {
       xhr.responseType = 'arraybuffer';
       xhr.onload = function() {
         DB = new SQL.Database(new Uint8Array(this.response));
-        $('#splash-banner').slideUp();
-        $('#views').slideDown();
+        refreshViews('SELECT title as Title, author_sort as Author FROM books;');
         $('#loading-modal').modal('hide');
-        currentView = DB.exec('SELECT title as Title, author_sort as Author, path FROM books;');
-        refreshTable();
       };
       // xhr.onerror = function() { callback(null) };
       xhr.send();
@@ -71,23 +68,55 @@ function pickerCallback(data) {
   }
 }
 
-function refreshViews(){
-  refreshTable();
-  refreshBookshelf();
-}
-
-function refreshTable(){
-  $('table').DataTable({
-    data: currentView[0].values,
-    columns: currentView[0].columns.map(c => ({title: c}))
+function refreshViews(query){
+  currentView = DB.exec(query)[0];
+  $('#splash-banner').slideUp();
+  $('#views').slideUp(e => {
+    $("#jsGrid").jsGrid({
+      width: "100%",
+      filtering: true,
+      editing: false,
+      sorting: true,
+      paging: true,
+      autoload: true,
+      pageSize: 10,
+      pageButtonCount: 5,
+      data: transform(currentView),
+      fields: currentView.columns.map(c => ({name: c, type: "text"}))
+    });
+    $('#views').slideDown();
   });
 }
 
-function refreshBookshelf(){
-
+function transform(input){
+  return input.values.map(v => {
+    let out = {};
+    v.forEach((cell, i) => out[input.columns[i]] = cell);
+    return out;
+  });
 }
 
 $(function(){
   $('html').removeClass('no-js');
+  $('#load-library-pseudo').click(e => $('#dropdown02').click());
   $('#google-drive-signin').click(loadPicker);
+  $('#view-books').click(e => {
+    refreshViews('SELECT title as Title, author_sort as Author FROM books;');
+  });
+  $('#view-series').click(e => {
+    refreshViews('SELECT name AS Series FROM series order by Series;');
+  });
+  $('#view-authors').click(e => {
+    refreshViews('SELECT name AS Author FROM authors order by Author;');
+  });
+  $('#view-publishers').click(e => {
+    refreshViews('SELECT name AS Publisher FROM publishers order by Publisher;');
+  });
+  $('#view-tags').click(e => {
+    refreshViews('SELECT name AS Tag FROM tags order by tag;');
+  });
+  $('#about-button').click(e => {
+    $('#splash-banner').slideDown();
+    $('#views').slideUp();
+  });
 });
